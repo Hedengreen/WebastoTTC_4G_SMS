@@ -1,6 +1,6 @@
 
 #include <Arduino.h>
-#include "config.h"
+#include "project_config.h"
 
 HardwareSerial SerialAT(1);
 
