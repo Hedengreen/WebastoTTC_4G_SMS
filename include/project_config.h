@@ -18,10 +18,6 @@
 // SMS SETTINGS
 // ========================================
 
-// Ändra till ditt eget nummer.
-// Internationellt format, exempelvis +46701234567.
-#define AUTHORIZED_PHONE "+46706325326"
-
 // Kontrollintervall för SMS
 #define SMS_CHECK_INTERVAL 3000
 
