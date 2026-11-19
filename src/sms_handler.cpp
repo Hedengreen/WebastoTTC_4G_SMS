@@ -1,6 +1,6 @@
 
 #include <Arduino.h>
-
+#include "gps.h"
 #include "sms_handler.h"
 #include "secrets.h"
 
@@ -187,7 +187,7 @@ String getCommandResponse(const SmsCommand& command) {
                 "Varmerstyrning ar annu inte aktiverad.";
 
         case SmsCommandType::Gps:
-            return "GPS-funktionen är ännu inte aktiverad.";
+            return gpsGetSmsResponse();
 
         default:
             return "Okant kommando. Skicka HELP för hjälp.";
