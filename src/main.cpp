@@ -6,6 +6,7 @@
 
 #include "heater.h"
 #include "sms.h"
+#include "wbus.h"
 #include "secrets.h"
 
 // =====================================================
@@ -24,6 +25,11 @@
 
 HardwareSerial SerialAT(1);
 TinyGsm modem(SerialAT);
+
+#define WBUS_RX_PIN 16
+#define WBUS_TX_PIN 17
+
+HardwareSerial SerialWBus(2);
 
 // =====================================================
 // MODEM POWER SEQUENCE
@@ -158,6 +164,10 @@ void setup()
 
     smsInit();
 
+    Serial.println("Wbus initialization...");
+    wbusInit(SerialWBus, WBUS_RX_PIN, WBUS_TX_PIN);
+    Serial.println("Wbus initialized.");
+
     // -------------------------------------------------
     // READY
     // -------------------------------------------------
@@ -175,6 +185,6 @@ void setup()
 void loop()
 {
     smsCheck();
-
+    wbusProcess();
     delay(5000);
 }
