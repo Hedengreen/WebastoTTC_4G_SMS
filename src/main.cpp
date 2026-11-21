@@ -1,195 +1,113 @@
 
+#define TINY_GSM_MODEM_SIM7600
+
 #include <Arduino.h>
+#include <TinyGsmClient.h>
 
-#include "project_config.h"
-#include "secrets.h"
-#include "modem.h"
-#include "sms_handler.h"
+// LilyGO T-A7670G / ESP32
+#define MODEM_RX_PIN 27
+#define MODEM_TX_PIN 26
 
-// ========================================
-// MODEM
-// ========================================
+#define MODEM_DTR_PIN 25
+#define MODEM_PWRKEY_PIN 4
+#define MODEM_POWERON_PIN 12
+#define MODEM_RESET_PIN 5
+
+#define MODEM_RESET_LEVEL HIGH
 
 HardwareSerial SerialAT(1);
+TinyGsm modem(SerialAT);
 
-bool modemReady = false;
-
-unsigned long lastSmsCheck = 0;
-
-
-// ========================================
-// STARTA MODEMET
-// ========================================
-
-bool startModem() {
-    Serial.println("\nStarting modem...");
-
-    // Aktivera modemets strömförsörjning
+void modemPowerOn()
+{
     pinMode(MODEM_POWERON_PIN, OUTPUT);
     digitalWrite(MODEM_POWERON_PIN, HIGH);
 
-    // Håll modemet vaket
+    pinMode(MODEM_RESET_PIN, OUTPUT);
+    digitalWrite(MODEM_RESET_PIN, !MODEM_RESET_LEVEL);
+    delay(100);
+
+    digitalWrite(MODEM_RESET_PIN, MODEM_RESET_LEVEL);
+    delay(2600);
+
+    digitalWrite(MODEM_RESET_PIN, !MODEM_RESET_LEVEL);
+
     pinMode(MODEM_DTR_PIN, OUTPUT);
     digitalWrite(MODEM_DTR_PIN, LOW);
 
-    // Starta modemets UART
-    SerialAT.begin(
-        MODEM_BAUDRATE,
-        SERIAL_8N1,
-        MODEM_RX_PIN,
-        MODEM_TX_PIN
-    );
-
-    delay(500);
-
-    // Power-on key pulse
     pinMode(MODEM_PWRKEY_PIN, OUTPUT);
     digitalWrite(MODEM_PWRKEY_PIN, LOW);
     delay(100);
 
     digitalWrite(MODEM_PWRKEY_PIN, HIGH);
-    delay(1000);
+    delay(100);
 
     digitalWrite(MODEM_PWRKEY_PIN, LOW);
-
-    // Kontrollera att modemet svarar
-    unsigned long start = millis();
-
-    while (millis() - start < 30000) {
-        while (SerialAT.available()) {
-            SerialAT.read();
-        }
-
-        SerialAT.println("AT");
-
-        String response;
-        unsigned long attempt = millis();
-
-        while (millis() - attempt < 1000) {
-            while (SerialAT.available()) {
-                response += (char)SerialAT.read();
-            }
-
-            if (response.indexOf("OK") >= 0) {
-                Serial.println("Modem is responding!");
-                return true;
-            }
-
-            delay(1);
-        }
-
-        Serial.println("Waiting for modem...");
-    }
-
-    Serial.println("ERROR: Modem did not respond!");
-
-    return false;
 }
 
-
-// ========================================
-// BEHANDLA MOTTAGET SMS
-// ========================================
-
-void processIncomingSms() {
-    SmsMessage sms;
-
-    // Försök läsa ett oläst SMS
-    if (!modemReadNextSms(sms)) {
-        return;
-    }
-
-    Serial.println("\nNew SMS received!");
-
-    Serial.println("Sender: " + sms.sender);
-    Serial.println("Message: " + sms.text);
-
-    // Kontrollera avsändarens behörighet
-    if (!isAuthorizedNumber(sms.sender)) {
-        Serial.println("Unauthorized sender!");
-
-        // Radera SMS så att det inte behandlas igen
-        modemDeleteSms(sms.index);
-
-        return;
-    }
-
-    Serial.println("Authorized sender.");
-
-    // Tolka SMS-kommandot
-    SmsCommand command = parseSmsCommand(sms.text);
-
-    // Skapa svar
-    String response = getCommandResponse(command);
-
-    Serial.println("Sending response...");
-
-    // Skicka svar till avsändaren
-    bool sent = modemSendSms(sms.sender, response);
-
-    if (sent) {
-        Serial.println("Response SMS sent.");
-    } else {
-        Serial.println("Failed to send response SMS.");
-    }
-
-    // Radera SMS efter hantering
-    if (modemDeleteSms(sms.index)) {
-        Serial.println("SMS deleted.");
-    } else {
-        Serial.println("Could not delete SMS.");
-    }
-}
-
-
-// ========================================
-// SETUP
-// ========================================
-
-void setup() {
+void setup()
+{
     Serial.begin(115200);
-
     delay(1000);
 
-    Serial.println("\n==============================");
-    Serial.println("MULTIVAN WEBSTO CONTROLLER");
-    Serial.println("==============================");
+    Serial.println();
+    Serial.println("Starting Webasto SMS controller");
 
-    // Starta modemet
-    if (!startModem()) {
-        Serial.println("Modem startup failed.");
+    SerialAT.begin(115200, SERIAL_8N1, MODEM_RX_PIN, MODEM_TX_PIN);
+
+    modemPowerOn();
+    delay(3000);
+
+    Serial.println("Initializing TinyGSM...");
+
+    if (!modem.init())
+    {
+        Serial.println("TinyGSM initialization failed!");
         return;
     }
 
-    // Konfigurera SMS-funktionen
-    modemReady = modemBegin();
+    Serial.println("TinyGSM initialized!");
 
-    if (modemReady) {
-        Serial.println("SMS system ready!");
-    } else {
-        Serial.println("SMS initialization failed!");
+    Serial.print("Modem: ");
+    Serial.println(modem.getModemName());
+
+    Serial.println();
+    Serial.println("Checking SIM...");
+
+    if (modem.getSimStatus() == SIM_READY)
+    {
+        Serial.println("SIM card is ready.");
     }
+    else
+    {
+        Serial.println("SIM card is not ready.");
+    }
+
+    Serial.println();
+    Serial.println("Waiting for network...");
+
+    if (modem.waitForNetwork(60000L))
+    {
+        Serial.println("Network registered!");
+
+        Serial.print("Signal quality: ");
+        Serial.println(modem.getSignalQuality());
+
+        Serial.print("Network connected: ");
+        Serial.println(modem.isNetworkConnected());
+    }
+    else
+    {
+        Serial.println("Network registration failed.");
+
+        Serial.print("Signal quality: ");
+        Serial.println(modem.getSignalQuality());
+    }
+
+    Serial.println();
+    Serial.println("Diagnostic complete.");
 }
 
-
-// ========================================
-// LOOP
-// ========================================
-
-void loop() {
-
-    if (!modemReady) {
-        delay(1000);
-        return;
-    }
-
-    // Kontrollera efter nya SMS med jämna intervall
-    if (millis() - lastSmsCheck >= SMS_CHECK_INTERVAL) {
-
-        lastSmsCheck = millis();
-
-        processIncomingSms();
-    }
-
-    delay(10);
+void loop()
+{
 }
