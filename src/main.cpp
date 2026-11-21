@@ -1,5 +1,6 @@
 
 #define TINY_GSM_MODEM_SIM7600
+#include "heater.h"
 
 #include <Arduino.h>
 #include <TinyGsmClient.h>
@@ -26,11 +27,7 @@ TinyGsm modem(SerialAT);
 // STATE
 // =====================================================
 
-bool heaterRunning = false;
-bool startRequested = false;
-int requestedRunTime = 0;
 
-bool wbusEnabled = false;
 
 // =====================================================
 // MODEM POWER SEQUENCE
@@ -167,49 +164,7 @@ bool isAuthorizedNumber(String number)
     return false;
 }
 
-// =====================================================
-// WEBasto PLACEHOLDERS
-// =====================================================
 
-void startHeater(int minutes)
-{
-    // SAFETY:
-    // No W-Bus commands are sent.
-    // No heater activation occurs.
-
-    startRequested = false;
-    heaterRunning = false;
-    requestedRunTime = 0;
-
-    Serial.println("START command accepted for testing.");
-    Serial.println("Heater activation is disabled.");
-}
-
-void stopHeater()
-{
-    // SAFETY:
-    // No W-Bus commands are sent.
-    // This is only a logical stop request.
-
-    startRequested = false;
-    heaterRunning = false;
-    requestedRunTime = 0;
-
-    Serial.println("STOP command received.");
-    Serial.println("W-Bus is inactive.");
-}
-
-String getStatus()
-{
-    String status = "Webasto SMS Controller\n";
-
-    status += "Modem: Initialized\n";
-    status += "Heater feedback: Unavailable\n";
-    status += "Heater control: Disabled\n";
-    status += "W-Bus: Inactive\n";
-
-    return status;
-}
 
 // =====================================================
 // SMS COMMAND PROCESSING
